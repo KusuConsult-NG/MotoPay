@@ -216,7 +216,6 @@ export default function VehicleLookup() {
                                     ].map((item) => {
                                         const doc = compliance?.documents.find(d => d.type === item.type);
                                         const isExpired = doc?.status === 'EXPIRED' || doc?.status === 'NOT_FOUND';
-                                        const isValid = doc?.status === 'VALID';
 
                                         return (
                                             <div key={item.type} className={`bg-white dark:bg-slate-900 border ${isExpired ? 'border-red-100 dark:border-red-900/30' : 'border-green-100 dark:border-green-900/30'} p-5 rounded-xl flex flex-col justify-between shadow-sm relative overflow-hidden group`}>

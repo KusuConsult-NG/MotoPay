@@ -93,7 +93,7 @@ export default function Checkout() {
                             toast.error('Payment cancelled');
                             setIsLoading(false);
                         },
-                        callback: async (paystackResponse: any) => {
+                        callback: async (_paystackResponse: any) => {
                             // Verify payment with backend
                             try {
                                 const verifyResponse = await paymentService.verifyPayment(reference);
