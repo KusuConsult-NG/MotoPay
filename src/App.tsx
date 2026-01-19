@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { AuthProvider } from './contexts/AuthContext';
 import MainLayout from './layouts/MainLayout';
 import Home from './pages/Home';
 import VehicleLookup from './pages/VehicleLookup';
@@ -14,30 +15,71 @@ import PriceConfiguration from './pages/PriceConfiguration';
 import Login from './pages/Login';
 import ErrorBoundary from './components/ErrorBoundary';
 import ToastProvider from './components/ToastProvider';
+import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
   return (
     <ErrorBoundary>
       <BrowserRouter>
-        <ToastProvider />
-        <Routes>
-          <Route path="/" element={<MainLayout />}>
-            <Route index element={<Home />} />
-            <Route path="lookup" element={<VehicleLookup />} />
-            <Route path="commercial" element={<CommercialCompliance />} />
-            <Route path="checkout" element={<Checkout />} />
-            <Route path="payment/callback" element={<PaymentCallback />} />
-            <Route path="receipt" element={<Receipt />} />
-          </Route>
-          {/* Agent portal has its own layout */}
-          <Route path="/login" element={<Login />} />
-          <Route path="/agent" element={<AgentPortal />} />
-          {/* Admin pages with their own layouts */}
-          <Route path="/admin" element={<AdminDashboard />} />
-          <Route path="/admin/exceptions" element={<ExceptionQueue />} />
-          <Route path="/admin/resolution" element={<VehicleResolution />} />
-          <Route path="/admin/pricing" element={<PriceConfiguration />} />
-        </Routes>
+        <AuthProvider>
+          <ToastProvider />
+          <Routes>
+            <Route path="/" element={<MainLayout />}>
+              <Route index element={<Home />} />
+              <Route path="lookup" element={<VehicleLookup />} />
+              <Route path="commercial" element={<CommercialCompliance />} />
+              <Route path="checkout" element={<Checkout />} />
+              <Route path="payment/callback" element={<PaymentCallback />} />
+              <Route path="receipt" element={<Receipt />} />
+            </Route>
+            {/* Login - public route */}
+            <Route path="/login" element={<Login />} />
+
+            {/* Agent portal - protected route for AGENT role */}
+            <Route
+              path="/agent"
+              element={
+                <ProtectedRoute roles={['AGENT']}>
+                  <AgentPortal />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Admin pages - protected routes for ADMIN and SUPER_ADMIN roles */}
+            <Route
+              path="/admin"
+              element={
+                <ProtectedRoute roles={['ADMIN', 'SUPER_ADMIN']}>
+                  <AdminDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/exceptions"
+              element={
+                <ProtectedRoute roles={['ADMIN', 'SUPER_ADMIN']}>
+                  <ExceptionQueue />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/resolution"
+              element={
+                <ProtectedRoute roles={['ADMIN', 'SUPER_ADMIN']}>
+                  <VehicleResolution />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/pricing"
+              element={
+                <ProtectedRoute roles={['ADMIN', 'SUPER_ADMIN']}>
+                  <PriceConfiguration />
+                </ProtectedRoute>
+              }
+            />
+          </Routes>
+        </AuthProvider>
       </BrowserRouter>
     </ErrorBoundary>
   );
