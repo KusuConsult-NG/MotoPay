@@ -1,7 +1,70 @@
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import PageTransition from '../components/PageTransition';
+import LoadingSpinner from '../components/ui/LoadingSpinner';
+import contentService, { type AboutSection } from '../services/content.service';
 
 export default function About() {
+    const [sections, setSections] = useState<AboutSection[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+
+    // Static fallback data
+    const staticContent = {
+        mission: {
+            title: 'Our Mission',
+            content: 'MotoPay is the official digital platform for the Plateau State Internal Revenue Service (PSIRS) designed to simplify vehicle licensing, renewals, and compliance management. We are committed to providing efficient, transparent, and accessible services to all vehicle owners in Plateau State.',
+        },
+        whatWeDo: {
+            title: 'What We Do',
+            items: [
+                'Process vehicle registrations and license renewals online',
+                'Verify vehicle compliance with state regulations',
+                'Manage commercial vehicle permits and badges',
+                'Provide secure payment processing through Paystack',
+                'Support authorized agents with commission tracking',
+            ],
+        },
+        whyChoose: {
+            title: 'Why Choose MotoPay?',
+            items: [
+                { icon: 'speed', title: 'Fast & Efficient', description: 'Complete renewals in minutes, not hours' },
+                { icon: 'security', title: 'Secure Payments', description: 'Bank-grade encryption for all transactions' },
+                { icon: 'phone_android', title: 'Mobile Friendly', description: 'Access from any device, anywhere' },
+                { icon: 'support_agent', title: '24/7 Support', description: "We're here to help when you need us" },
+            ],
+        },
+    };
+
+    useEffect(() => {
+        const fetchAbout = async () => {
+            try {
+                const response = await contentService.getAboutSections();
+                if (response.success && response.data && response.data.length > 0) {
+                    setSections(response.data);
+                }
+            } catch (error) {
+                console.error('Failed to fetch about sections, using static data:', error);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        fetchAbout();
+    }, []);
+
+    if (isLoading) {
+        return (
+            <div className="min-h-screen flex items-center justify-center">
+                <LoadingSpinner />
+            </div>
+        );
+    }
+
+    // Use API data if available, otherwise use static content
+    const mission = sections.find(s => s.section === 'mission') || staticContent.mission;
+    const whatWeDo = sections.find(s => s.section === 'what-we-do') || staticContent.whatWeDo;
+    const whyChoose = sections.find(s => s.section === 'why-choose') || staticContent.whyChoose;
+
     return (
         <PageTransition>
             <div className="min-h-screen bg-background-light">
@@ -17,69 +80,36 @@ export default function About() {
                 <div className="max-w-[900px] mx-auto px-6 py-16">
                     <div className="bg-white rounded-2xl border border-[#cfd3e7] p-12 space-y-8">
                         <div>
-                            <h2 className="text-3xl font-bold text-[#0d101b] mb-4">Our Mission</h2>
+                            <h2 className="text-3xl font-bold text-[#0d101b] mb-4">{mission.title}</h2>
                             <p className="text-[#4c599a] leading-relaxed text-lg">
-                                MotoPay is the official digital platform for the Plateau State Internal Revenue Service (PSIRS) designed to simplify vehicle licensing, renewals, and compliance management. We are committed to providing efficient, transparent, and accessible services to all vehicle owners in Plateau State.
+                                {mission.content}
                             </p>
                         </div>
 
                         <div>
-                            <h2 className="text-3xl font-bold text-[#0d101b] mb-4">What We Do</h2>
+                            <h2 className="text-3xl font-bold text-[#0d101b] mb-4">{whatWeDo.title}</h2>
                             <ul className="space-y-3 text-[#4c599a] leading-relaxed text-lg">
-                                <li className="flex items-start gap-3">
-                                    <span className="material-symbols-outlined text-plateau-green mt-1">check_circle</span>
-                                    <span>Process vehicle registrations and license renewals online</span>
-                                </li>
-                                <li className="flex items-start gap-3">
-                                    <span className="material-symbols-outlined text-plateau-green mt-1">check_circle</span>
-                                    <span>Verify vehicle compliance with state regulations</span>
-                                </li>
-                                <li className="flex items-start gap-3">
-                                    <span className="material-symbols-outlined text-plateau-green mt-1">check_circle</span>
-                                    <span>Manage commercial vehicle permits and badges</span>
-                                </li>
-                                <li className="flex items-start gap-3">
-                                    <span className="material-symbols-outlined text-plateau-green mt-1">check_circle</span>
-                                    <span>Provide secure payment processing through Paystack</span>
-                                </li>
-                                <li className="flex items-start gap-3">
-                                    <span className="material-symbols-outlined text-plateau-green mt-1">check_circle</span>
-                                    <span>Support authorized agents with commission tracking</span>
-                                </li>
+                                {(whatWeDo.items || []).map((item: string, index: number) => (
+                                    <li key={index} className="flex items-start gap-3">
+                                        <span className="material-symbols-outlined text-plateau-green mt-1">check_circle</span>
+                                        <span>{item}</span>
+                                    </li>
+                                ))}
                             </ul>
                         </div>
 
                         <div>
-                            <h2 className="text-3xl font-bold text-[#0d101b] mb-4">Why Choose MotoPay?</h2>
+                            <h2 className="text-3xl font-bold text-[#0d101b] mb-4">{whyChoose.title}</h2>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div className="p-6 bg-primary/5 rounded-lg">
-                                    <h3 className="font-bold text-[#0d101b] mb-2 flex items-center gap-2">
-                                        <span className="material-symbols-outlined text-primary">speed</span>
-                                        Fast & Efficient
-                                    </h3>
-                                    <p className="text-sm text-[#4c599a]">Complete renewals in minutes, not hours</p>
-                                </div>
-                                <div className="p-6 bg-primary/5 rounded-lg">
-                                    <h3 className="font-bold text-[#0d101b] mb-2 flex items-center gap-2">
-                                        <span className="material-symbols-outlined text-primary">security</span>
-                                        Secure Payments
-                                    </h3>
-                                    <p className="text-sm text-[#4c599a]">Bank-grade encryption for all transactions</p>
-                                </div>
-                                <div className="p-6 bg-primary/5 rounded-lg">
-                                    <h3 className="font-bold text-[#0d101b] mb-2 flex items-center gap-2">
-                                        <span className="material-symbols-outlined text-primary">phone_android</span>
-                                        Mobile Friendly
-                                    </h3>
-                                    <p className="text-sm text-[#4c599a]">Access from any device, anywhere</p>
-                                </div>
-                                <div className="p-6 bg-primary/5 rounded-lg">
-                                    <h3 className="font-bold text-[#0d101b] mb-2 flex items-center gap-2">
-                                        <span className="material-symbols-outlined text-primary">support_agent</span>
-                                        24/7 Support
-                                    </h3>
-                                    <p className="text-sm text-[#4c599a]">We're here to help when you need us</p>
-                                </div>
+                                {(whyChoose.items || []).map((benefit: any, index: number) => (
+                                    <div key={index} className="p-6 bg-primary/5 rounded-lg">
+                                        <h3 className="font-bold text-[#0d101b] mb-2 flex items-center gap-2">
+                                            <span className="material-symbols-outlined text-primary">{benefit.icon}</span>
+                                            {benefit.title}
+                                        </h3>
+                                        <p className="text-sm text-[#4c599a]">{benefit.description}</p>
+                                    </div>
+                                ))}
                             </div>
                         </div>
 

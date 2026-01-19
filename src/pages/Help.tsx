@@ -1,69 +1,184 @@
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import PageTransition from '../components/PageTransition';
 import { StaggerContainer, StaggerItem } from '../components/ui/Animations';
+import LoadingSpinner from '../components/ui/LoadingSpinner';
+import contentService, { type FAQ, type HelpCategory } from '../services/content.service';
 
 export default function Help() {
-    const faqs = [
+    const [faqs, setFaqs] = useState<FAQ[]>([]);
+    const [categories, setCategories] = useState<HelpCategory[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+
+    // Static fallback data
+    const staticFaqs: FAQ[] = [
         {
+            id: '1',
+            category: 'general',
             question: 'How do I renew my vehicle license?',
             answer: 'Start by entering your vehicle plate number on the lookup page. Verify your details, select renewal options, and proceed to payment. You will receive your receipt via email and SMS.',
+            order: 1,
+            isActive: true,
+            createdAt: '',
+            updatedAt: '',
         },
         {
+            id: '2',
+            category: 'payments',
             question: 'What payment methods are accepted?',
             answer: 'We accept all major debit and credit cards through our secure Paystack payment gateway. You can also pay using bank transfers and USSD.',
+            order: 2,
+            isActive: true,
+            createdAt: '',
+            updatedAt: '',
         },
         {
+            id: '3',
+            category: 'general',
             question: 'How long does processing take?',
             answer: 'Most renewals are processed instantly after payment confirmation. Your receipt and license documents are sent to your email immediately upon successful payment.',
+            order: 3,
+            isActive: true,
+            createdAt: '',
+            updatedAt: '',
         },
         {
+            id: '4',
+            category: 'registration',
             question: 'What documents do I need?',
             answer: 'For renewals, you typically need your vehicle registration, proof of ownership, road worthiness certificate, and insurance. Commercial vehicles may require additional permits.',
+            order: 4,
+            isActive: true,
+            createdAt: '',
+            updatedAt: '',
         },
         {
+            id: '5',
+            category: 'general',
             question: 'Can I renew for multiple vehicles?',
             answer: 'Yes! You can renew multiple vehicles by completing the process for each vehicle separately. Authorized agents can also handle bulk renewals.',
+            order: 5,
+            isActive: true,
+            createdAt: '',
+            updatedAt: '',
         },
         {
+            id: '6',
+            category: 'compliance',
             question: 'How do I become an agent?',
             answer: 'Contact PSIRS at agent@motopay.ng with your application. Approved agents receive login credentials and can track commissions through the agent portal.',
+            order: 6,
+            isActive: true,
+            createdAt: '',
+            updatedAt: '',
         },
         {
+            id: '7',
+            category: 'general',
             question: 'What if my vehicle information is wrong?',
             answer: 'If you notice incorrect vehicle information, please contact our support team immediately. Exceptions can be raised through the admin panel for resolution.',
+            order: 7,
+            isActive: true,
+            createdAt: '',
+            updatedAt: '',
         },
         {
+            id: '8',
+            category: 'payments',
             question: 'How do I get a receipt?',
             answer: 'Receipts are automatically sent to your email and phone number after successful payment. You can also access and download receipts from your transaction history.',
+            order: 8,
+            isActive: true,
+            createdAt: '',
+            updatedAt: '',
         },
     ];
 
-    const categories = [
+    const staticCategories: HelpCategory[] = [
         {
+            id: '1',
             icon: 'directions_car',
             title: 'Vehicle Registration',
             link: '/lookup',
             description: 'Learn about registering new and used vehicles',
+            order: 1,
+            isActive: true,
+            createdAt: '',
+            updatedAt: '',
         },
         {
+            id: '2',
             icon: 'payment',
             title: 'Payments & Fees',
             link: '/services',
             description: 'Understanding fees, charges, and payment options',
+            order: 2,
+            isActive: true,
+            createdAt: '',
+            updatedAt: '',
         },
         {
+            id: '3',
             icon: 'verified',
             title: 'Compliance',
             link: '/commercial',
             description: 'Requirements for commercial and private vehicles',
+            order: 3,
+            isActive: true,
+            createdAt: '',
+            updatedAt: '',
         },
         {
+            id: '4',
             icon: 'support_agent',
             title: 'Agent Support',
             link: '/login',
             description: 'Resources for authorized agents',
+            order: 4,
+            isActive: true,
+            createdAt: '',
+            updatedAt: '',
         },
     ];
+
+    useEffect(() => {
+        const fetchHelpContent = async () => {
+            try {
+                const [faqsResponse, categoriesResponse] = await Promise.all([
+                    contentService.getFAQs(),
+                    contentService.getHelpCategories(),
+                ]);
+
+                if (faqsResponse.success && faqsResponse.data && faqsResponse.data.length > 0) {
+                    setFaqs(faqsResponse.data);
+                } else {
+                    setFaqs(staticFaqs);
+                }
+
+                if (categoriesResponse.success && categoriesResponse.data && categoriesResponse.data.length > 0) {
+                    setCategories(categoriesResponse.data);
+                } else {
+                    setCategories(staticCategories);
+                }
+            } catch (error) {
+                console.error('Failed to fetch help content, using static data:', error);
+                setFaqs(staticFaqs);
+                setCategories(staticCategories);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        fetchHelpContent();
+    }, []);
+
+    if (isLoading) {
+        return (
+            <div className="min-h-screen flex items-center justify-center">
+                <LoadingSpinner />
+            </div>
+        );
+    }
 
     return (
         <PageTransition>
