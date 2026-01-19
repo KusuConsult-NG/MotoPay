@@ -17,6 +17,11 @@ const Checkout = lazy(() => import('./pages/Checkout'));
 const PaymentCallback = lazy(() => import('./pages/PaymentCallback'));
 const Receipt = lazy(() => import('./pages/Receipt'));
 const Login = lazy(() => import('./pages/Login'));
+const Register = lazy(() => import('./pages/Register'));
+const Services = lazy(() => import('./pages/Services'));
+const About = lazy(() => import('./pages/About'));
+const Contact = lazy(() => import('./pages/Contact'));
+const Help = lazy(() => import('./pages/Help'));
 
 // Lazy-load protected pages
 const AgentPortal = lazy(() => import('./pages/AgentPortal'));
@@ -47,9 +52,14 @@ function App() {
                 <Route path="checkout" element={<Checkout />} />
                 <Route path="payment/callback" element={<PaymentCallback />} />
                 <Route path="receipt" element={<Receipt />} />
+                <Route path="services" element={<Services />} />
+                <Route path="about" element={<About />} />
+                <Route path="contact" element={<Contact />} />
+                <Route path="help" element={<Help />} />
               </Route>
-              {/* Login - public route */}
+              {/* Auth routes */}
               <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} />
 
               {/* Agent portal - protected route for AGENT role */}
               <Route
