@@ -1,19 +1,9 @@
-import { useState } from 'react';
-import { format } from 'date-fns';
+import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
+import pricingService, { type PricingConfig } from '../services/pricing.service';
 import PageTransition from '../components/PageTransition';
 import AnimatedButton from '../components/ui/AnimatedButton';
-
-interface PriceItem {
-    id: string;
-    category: string;
-    service: string;
-    vehicleType: 'private' | 'commercial' | 'special';
-    price: number;
-    effectiveDate: string;
-    lastModified: string;
-    modifiedBy: string;
-}
+import LoadingSpinner from '../components/ui/LoadingSpinner';
 
 interface AuditLog {
     id: string;
@@ -26,133 +16,67 @@ interface AuditLog {
 }
 
 export default function PriceConfiguration() {
-    const [activeTab, setActiveTab] = useState<'private' | 'commercial' | 'special'>('private');
+    const [activeTab, setActiveTab] = useState<'PRIVATE' | 'COMMERCIAL' | 'MOTORCYCLE'>('PRIVATE');
     const [editingId, setEditingId] = useState<string | null>(null);
     const [editValue, setEditValue] = useState('');
+    const [priceItems, setPriceItems] = useState<PricingConfig[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
 
-    const [priceItems, setPriceItems] = useState<PriceItem[]>([
-        {
-            id: '1',
-            category: 'Vehicle License',
-            service: 'Annual Private License',
-            vehicleType: 'private',
-            price: 12500,
-            effectiveDate: '2024-01-01',
-            lastModified: '2024-01-10',
-            modifiedBy: 'Admin Ruth'
-        },
-        {
-            id: '2',
-            category: 'Insurance',
-            service: 'Third Party Insurance',
-            vehicleType: 'private',
-            price: 5000,
-            effectiveDate: '2024-01-01',
-            lastModified: '2024-01-10',
-            modifiedBy: 'Admin Ruth'
-        },
-        {
-            id: '3',
-            category: 'Processing',
-            service: 'Platform Fee',
-            vehicleType: 'private',
-            price: 250,
-            effectiveDate: '2024-01-01',
-            lastModified: '2024-01-10',
-            modifiedBy: 'Admin Ruth'
-        },
-        {
-            id: '4',
-            category: 'Vehicle License',
-            service: 'Commercial License',
-            vehicleType: 'commercial',
-            price: 25000,
-            effectiveDate: '2024-01-01',
-            lastModified: '2024-01-10',
-            modifiedBy: 'Admin Ruth'
-        },
-        {
-            id: '5',
-            category: 'Permits',
-            service: 'Hackney Permit',
-            vehicleType: 'commercial',
-            price: 7500,
-            effectiveDate: '2024-01-01',
-            lastModified: '2024-01-10',
-            modifiedBy: 'Admin Ruth'
-        },
-        {
-            id: '6',
-            category: 'Badges',
-            service: "Driver's Badge",
-            vehicleType: 'commercial',
-            price: 3000,
-            effectiveDate: '2024-01-01',
-            lastModified: '2024-01-10',
-            modifiedBy: 'Admin Ruth'
+    useEffect(() => {
+        loadPricingData();
+    }, []);
+
+    const loadPricingData = async () => {
+        setIsLoading(true);
+        try {
+            const response = await pricingService.getPricing();
+            if (response.success && response.data) {
+                setPriceItems(response.data);
+            }
+        } catch (error) {
+            console.error('Failed to load pricing:', error);
+            toast.error('Failed to load pricing configuration');
+        } finally {
+            setIsLoading(false);
         }
-    ]);
-
-    const auditLogs: AuditLog[] = [
-        {
-            id: 'A-101',
-            timestamp: '2024-01-15 14:30',
-            user: 'Admin Ruth',
-            action: 'Price Increase',
-            service: 'Annual Private License',
-            oldPrice: 12000,
-            newPrice: 12500
-        },
-        {
-            id: 'A-100',
-            timestamp: '2024-01-10 09:15',
-            user: 'Supervisor John',
-            action: 'Price Adjustment',
-            service: 'Third Party Insurance',
-            oldPrice: 4500,
-            newPrice: 5000
-        },
-        {
-            id: 'A-099',
-            timestamp: '2024-01-05 16:45',
-            user: 'Admin Ruth',
-            action: 'New Price Entry',
-            service: 'Platform Fee',
-            oldPrice: 0,
-            newPrice: 250
-        }
-    ];
-
-    const filteredPrices = priceItems.filter(item => item.vehicleType === activeTab);
-
-    const startEditing = (item: PriceItem) => {
-        setEditingId(item.id);
-        setEditValue(item.price.toString());
     };
 
-    const saveEdit = (id: string) => {
+    const auditLogs: AuditLog[] = []; // TODO: Add audit log API
+
+    const filteredPrices = priceItems.filter(item => item.vehicleCategory === activeTab);
+
+    const startEditing = (item: PricingConfig) => {
+        setEditingId(item.id);
+        setEditValue(item.basePrice.toString());
+    };
+
+    const saveEdit = async (id: string) => {
         const newPrice = parseInt(editValue);
         if (isNaN(newPrice) || newPrice <= 0) {
             toast.error('Please enter a valid price');
             return;
         }
 
-        const item = priceItems.find(i => i.id === id);
-        setPriceItems(items =>
-            items.map(item =>
-                item.id === id
-                    ? {
-                        ...item,
-                        price: newPrice,
-                        lastModified: format(new Date(), 'yyyy-MM-dd'),
-                        modifiedBy: 'Current User'
-                    }
-                    : item
-            )
-        );
-        setEditingId(null);
-        setEditValue('');
-        toast.success(`Price updated for ${item?.service}`);
+        try {
+            const response = await pricingService.updatePricing(id, { basePrice: newPrice });
+            if (response.success) {
+                setPriceItems(items =>
+                    items.map(item =>
+                        item.id === id
+                            ? { ...item, basePrice: newPrice, lastUpdated: new Date().toISOString() }
+                            : item
+                    )
+                );
+                setEditingId(null);
+                setEditValue('');
+                toast.success('Price updated successfully');
+            } else {
+                toast.error(response.message || 'Failed to update price');
+            }
+        } catch (error) {
+            console.error('Failed to save price:', error);
+            toast.error('Failed to save price');
+        }
     };
 
     const cancelEdit = () => {
@@ -160,6 +84,14 @@ export default function PriceConfiguration() {
         setEditValue('');
         toast('Edit cancelled', { icon: 'ℹ️' });
     };
+
+    if (isLoading) {
+        return (
+            <div className="flex items-center justify-center h-screen">
+                <LoadingSpinner />
+            </div>
+        );
+    }
 
     return (
         <PageTransition>
@@ -197,7 +129,7 @@ export default function PriceConfiguration() {
                         {/* Tabs */}
                         <div className="border-b border-[#e7e9f3] dark:border-[#2a2f45]">
                             <div className="flex gap-1 p-2">
-                                {(['private', 'commercial', 'special'] as const).map((tab) => (
+                                {(['PRIVATE', 'COMMERCIAL', 'MOTORCYCLE'] as const).map((tab) => (
                                     <button
                                         key={tab}
                                         onClick={() => setActiveTab(tab)}
@@ -228,8 +160,8 @@ export default function PriceConfiguration() {
                                 <tbody className="divide-y divide-[#e7e9f3] dark:divide-[#2a2f45]">
                                     {filteredPrices.map((item) => (
                                         <tr key={item.id} className="hover:bg-background-light/50 dark:hover:bg-[#2a2f45]/20">
-                                            <td className="px-6 py-4 font-semibold dark:text-white">{item.category}</td>
-                                            <td className="px-6 py-4 text-[#4c599a]">{item.service}</td>
+                                            <td className="px-6 py-4 font-semibold dark:text-white">{item.documentType}</td>
+                                            <td className="px-6 py-4 text-[#4c599a]">{item.description}</td>
                                             <td className="px-6 py-4 text-right">
                                                 {editingId === item.id ? (
                                                     <input
@@ -241,15 +173,15 @@ export default function PriceConfiguration() {
                                                     />
                                                 ) : (
                                                     <span className="text-lg font-black text-primary">
-                                                        ₦{item.price.toLocaleString()}
+                                                        ₦{item.basePrice.toLocaleString()}
                                                     </span>
                                                 )}
                                             </td>
-                                            <td className="px-6 py-4 text-sm text-[#4c599a]">{item.effectiveDate}</td>
+                                            <td className="px-6 py-4 text-sm text-[#4c599a]">{item.isActive ? 'Active' : 'Inactive'}</td>
                                             <td className="px-6 py-4">
                                                 <div className="text-sm">
-                                                    <p className="text-[#4c599a]">{item.lastModified}</p>
-                                                    <p className="text-xs text-[#4c599a]">by {item.modifiedBy}</p>
+                                                    <p className="text-[#4c599a]">{new Date(item.lastUpdated).toLocaleDateString()}</p>
+                                                    <p className="text-xs text-[#4c599a]">System</p>
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4">
