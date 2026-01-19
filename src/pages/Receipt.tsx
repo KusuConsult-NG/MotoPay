@@ -1,7 +1,94 @@
+import { useState, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { format } from 'date-fns';
+import toast from 'react-hot-toast';
 import PageTransition from '../components/PageTransition';
 import AnimatedButton from '../components/ui/AnimatedButton';
+import LoadingSpinner from '../components/ui/LoadingSpinner';
+import paymentService from '../services/payment.service';
+import type { Transaction } from '../types/api.types';
 
 export default function Receipt() {
+    const location = useLocation();
+    const navigate = useNavigate();
+    const [isLoading, setIsLoading] = useState(true);
+    const [transaction, setTransaction] = useState<Transaction | null>(null);
+
+    // Get transaction from navigation state or will need to fetch by ID
+    const stateTransaction = (location.state as any)?.transaction as Transaction | undefined;
+    const transactionId = (location.state as any)?.transactionId as string | undefined;
+
+    useEffect(() => {
+        const loadTransaction = async () => {
+            // If we have transaction in state, use it
+            if (stateTransaction) {
+                setTransaction(stateTransaction);
+                setIsLoading(false);
+                return;
+            }
+
+            // Otherwise, fetch by ID if available
+            if (transactionId) {
+                try {
+                    const response = await paymentService.getTransaction(transactionId);
+                    if (response.success && response.data) {
+                        setTransaction(response.data);
+                    } else {
+                        toast.error('Transaction not found');
+                        navigate('/');
+                    }
+                } catch (error) {
+                    console.error('Failed to load transaction:', error);
+                    navigate('/');
+                } finally {
+                    setIsLoading(false);
+                }
+            } else {
+                // No transaction data available
+                toast.error('No transaction data available');
+                navigate('/');
+            }
+        };
+
+        loadTransaction();
+    }, [stateTransaction, transactionId, navigate]);
+
+    const handlePrint = () => {
+        window.print();
+    };
+
+    if (isLoading) {
+        return (
+            <PageTransition>
+                <div className="min-h-screen flex items-center justify-center">
+                    <div className="text-center">
+                        <LoadingSpinner />
+                        <p className="mt-4 text-slate-600">Loading transaction details...</p>
+                    </div>
+                </div>
+            </PageTransition>
+        );
+    }
+
+    if (!transaction) {
+        return (
+            <PageTransition>
+                <div className="min-h-screen flex items-center justify-center">
+                    <div className="text-center">
+                        <p className="text-slate-600">No transaction data available</p>
+                        <AnimatedButton
+                            onClick={() => navigate('/')}
+                            variant="primary"
+                            className="mt-4"
+                        >
+                            Go to Home
+                        </AnimatedButton>
+                    </div>
+                </div>
+            </PageTransition>
+        );
+    }
+
     return (
         <PageTransition>
             <div className="flex flex-1 justify-center py-10 px-4 md:px-0">
@@ -29,7 +116,10 @@ export default function Receipt() {
                                     <h3 className="text-[#0d101b] text-xl font-bold">Transaction Receipt</h3>
                                 </div>
                                 <div className="flex gap-2">
-                                    <button className="flex items-center justify-center rounded-lg h-9 w-9 bg-white border border-[#e7e9f3] text-[#4c599a] hover:text-primary transition-colors">
+                                    <button
+                                        onClick={handlePrint}
+                                        className="flex items-center justify-center rounded-lg h-9 w-9 bg-white border border-[#e7e9f3] text-[#4c599a] hover:text-primary transition-colors"
+                                    >
                                         <span className="material-symbols-outlined text-sm">print</span>
                                     </button>
                                     <button className="flex items-center justify-center rounded-lg h-9 w-9 bg-white border border-[#e7e9f3] text-[#4c599a] hover:text-primary transition-colors">
@@ -43,50 +133,45 @@ export default function Receipt() {
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
                                     <div className="space-y-1">
                                         <p className="text-[#4c599a] text-xs font-medium uppercase">Transaction Reference</p>
-                                        <p className="text-[#0d101b] font-mono font-semibold">#PAY-99238-XYZ</p>
+                                        <p className="text-[#0d101b] font-mono font-semibold">#{transaction.reference}</p>
                                     </div>
                                     <div className="space-y-1 md:text-right">
                                         <p className="text-[#4c599a] text-xs font-medium uppercase">Date & Time</p>
                                         <p className="text-[#0d101b] font-semibold">
-                                            {new Date().toLocaleDateString('en-US', {
-                                                year: 'numeric',
-                                                month: 'long',
-                                                day: 'numeric',
-                                                hour: '2-digit',
-                                                minute: '2-digit'
-                                            })}
+                                            {transaction.paidAt
+                                                ? format(new Date(transaction.paidAt), 'MMMM d, yyyy, h:mm a')
+                                                : format(new Date(transaction.createdAt), 'MMMM d, yyyy, h:mm a')
+                                            }
                                         </p>
                                     </div>
                                 </div>
 
-                                <div className="bg-primary/5 rounded-lg p-4 mb-8 flex items-center gap-4 border border-primary/10">
-                                    <div className="bg-primary text-white rounded-lg p-2">
-                                        <span className="material-symbols-outlined">directions_car</span>
+                                {transaction.vehicle && (
+                                    <div className="bg-primary/5 rounded-lg p-4 mb-8 flex items-center gap-4 border border-primary/10">
+                                        <div className="bg-primary text-white rounded-lg p-2">
+                                            <span className="material-symbols-outlined">directions_car</span>
+                                        </div>
+                                        <div>
+                                            <p className="text-[#4c599a] text-xs font-medium uppercase">Vehicle</p>
+                                            <p className="text-[#0d101b] font-bold text-lg">
+                                                {transaction.vehicle.plateNumber} - {transaction.vehicle.make} {transaction.vehicle.model}
+                                            </p>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <p className="text-[#4c599a] text-xs font-medium uppercase">Vehicle Plate Number</p>
-                                        <p className="text-[#0d101b] font-bold text-lg">PL-582-KN</p>
-                                    </div>
-                                </div>
+                                )}
 
                                 {/* Payment Breakdown */}
                                 <div className="border-t border-solid border-[#e7e9f3] pt-6 space-y-4">
                                     <h4 className="text-[#0d101b] font-bold text-sm mb-2">Breakdown of Payments</h4>
-                                    <div className="flex justify-between items-center">
-                                        <p className="text-[#4c599a] text-sm">Vehicle License (Annual)</p>
-                                        <p className="text-[#0d101b] text-sm font-semibold">₦12,500.00</p>
-                                    </div>
-                                    <div className="flex justify-between items-center">
-                                        <p className="text-[#4c599a] text-sm">Statutory Insurance Premium</p>
-                                        <p className="text-[#0d101b] text-sm font-semibold">₦5,000.00</p>
-                                    </div>
-                                    <div className="flex justify-between items-center">
-                                        <p className="text-[#4c599a] text-sm">Processing Fee</p>
-                                        <p className="text-[#0d101b] text-sm font-semibold">₦250.00</p>
-                                    </div>
+                                    {transaction.items.map((item, index) => (
+                                        <div key={index} className="flex justify-between items-center">
+                                            <p className="text-[#4c599a] text-sm">{item.description}</p>
+                                            <p className="text-[#0d101b] text-sm font-semibold">₦{item.amount.toLocaleString()}</p>
+                                        </div>
+                                    ))}
                                     <div className="border-t border-solid border-[#e7e9f3] pt-4 mt-2 flex justify-between items-center">
                                         <p className="text-[#0d101b] font-bold text-base">Total Amount Paid</p>
-                                        <p className="text-primary font-extrabold text-xl">₦17,750.00</p>
+                                        <p className="text-primary font-extrabold text-xl">₦{transaction.amount.toLocaleString()}</p>
                                     </div>
                                 </div>
 
@@ -114,13 +199,23 @@ export default function Receipt() {
 
                     {/* Action Footer */}
                     <div className="flex flex-col sm:flex-row gap-4 mt-8 px-1">
-                        <AnimatedButton variant="primary" size="lg" className="flex-1 flex items-center justify-center gap-2">
+                        <AnimatedButton
+                            variant="primary"
+                            size="lg"
+                            className="flex-1 flex items-center justify-center gap-2"
+                            onClick={handlePrint}
+                        >
                             <span className="material-symbols-outlined">download</span>
                             Download PDF Receipt
                         </AnimatedButton>
-                        <AnimatedButton variant="secondary" size="lg" className="flex-1 flex items-center justify-center gap-2">
-                            <span className="material-symbols-outlined">verified_user</span>
-                            View Insurance Policy
+                        <AnimatedButton
+                            variant="secondary"
+                            size="lg"
+                            className="flex-1 flex items-center justify-center gap-2"
+                            onClick={() => navigate('/')}
+                        >
+                            <span className="material-symbols-outlined">home</span>
+                            Back to Home
                         </AnimatedButton>
                     </div>
 

@@ -3,6 +3,7 @@ import MainLayout from './layouts/MainLayout';
 import Home from './pages/Home';
 import VehicleLookup from './pages/VehicleLookup';
 import Checkout from './pages/Checkout';
+import PaymentCallback from './pages/PaymentCallback';
 import Receipt from './pages/Receipt';
 import CommercialCompliance from './pages/CommercialCompliance';
 import AgentPortal from './pages/AgentPortal';
@@ -10,6 +11,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import ExceptionQueue from './pages/ExceptionQueue';
 import VehicleResolution from './pages/VehicleResolution';
 import PriceConfiguration from './pages/PriceConfiguration';
+import Login from './pages/Login';
 import ErrorBoundary from './components/ErrorBoundary';
 import ToastProvider from './components/ToastProvider';
 
@@ -24,9 +26,11 @@ function App() {
             <Route path="lookup" element={<VehicleLookup />} />
             <Route path="commercial" element={<CommercialCompliance />} />
             <Route path="checkout" element={<Checkout />} />
+            <Route path="payment/callback" element={<PaymentCallback />} />
             <Route path="receipt" element={<Receipt />} />
           </Route>
           {/* Agent portal has its own layout */}
+          <Route path="/login" element={<Login />} />
           <Route path="/agent" element={<AgentPortal />} />
           {/* Admin pages with their own layouts */}
           <Route path="/admin" element={<AdminDashboard />} />

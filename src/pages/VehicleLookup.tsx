@@ -1,18 +1,79 @@
 import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import PageTransition from '../components/PageTransition';
 import AnimatedButton from '../components/ui/AnimatedButton';
+import LoadingSpinner from '../components/ui/LoadingSpinner';
+import vehicleService from '../services/vehicle.service';
+import type { Vehicle, VehicleCompliance } from '../types/api.types';
 
 export default function VehicleLookup() {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
-    const [searchType, setSearchType] = useState<'tin' | 'plate'>('plate');
-    const [vehicleId, setVehicleId] = useState(searchParams.get('query') || 'PL-582-KN');
-    const [showResults, setShowResults] = useState(true);
+    const [searchType, setSearchType] = useState<'tin' | 'plate' | 'vin'>('plate');
+    const [vehicleId, setVehicleId] = useState(searchParams.get('query') || '');
+    const [isLoading, setIsLoading] = useState(false);
+    const [vehicle, setVehicle] = useState<Vehicle | null>(null);
+    const [compliance, setCompliance] = useState<VehicleCompliance | null>(null);
+    const [showResults, setShowResults] = useState(false);
 
-    const handleVerify = () => {
-        setShowResults(true);
-        // In a real app, this would fetch vehicle data from an API
+    const handleVerify = async () => {
+        if (!vehicleId.trim()) {
+            toast.error('Please enter a vehicle identifier');
+            return;
+        }
+
+        setIsLoading(true);
+        setShowResults(false);
+
+        try {
+            // Construct the request payload based on search type
+            const lookupPayload: any = {};
+            const trimmedId = vehicleId.trim();
+
+            if (searchType === 'tin') {
+                lookupPayload.tin = trimmedId;
+            } else if (searchType === 'plate') {
+                lookupPayload.plateNumber = trimmedId;
+            } else if (searchType === 'vin') {
+                lookupPayload.chassisNumber = trimmedId;
+            }
+
+            // Lookup vehicle first
+            const vehicleResponse = await vehicleService.lookupVehicle(lookupPayload);
+
+            if (vehicleResponse.success && vehicleResponse.data) {
+                setVehicle(vehicleResponse.data);
+
+                // Then get compliance info
+                try {
+                    const complianceResponse = await vehicleService.getVehicleCompliance(
+                        vehicleResponse.data.id
+                    );
+
+                    if (complianceResponse.success && complianceResponse.data) {
+                        setCompliance(complianceResponse.data);
+                    }
+                } catch (complianceError) {
+                    console.error('Compliance lookup failed:', complianceError);
+                    // Continue even if compliance fails - we have vehicle data
+                }
+
+                setShowResults(true);
+                toast.success('Vehicle found!');
+            } else {
+                toast.error('Vehicle not found');
+                setShowResults(false);
+            }
+        } catch (error: any) {
+            console.error('Vehicle lookup failed:', error);
+            setVehicle(null);
+            setCompliance(null);
+            setShowResults(false);
+            // Error toast is handled by API service interceptor
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     return (
@@ -95,9 +156,19 @@ export default function VehicleLookup() {
                             variant="primary"
                             size="lg"
                             className="w-full flex items-center justify-center gap-2"
+                            disabled={isLoading}
                         >
-                            <span>Verify Vehicle</span>
-                            <span className="material-symbols-outlined">arrow_forward</span>
+                            {isLoading ? (
+                                <>
+                                    <LoadingSpinner />
+                                    <span>Verifying...</span>
+                                </>
+                            ) : (
+                                <>
+                                    <span>Verify Vehicle</span>
+                                    <span className="material-symbols-outlined">arrow_forward</span>
+                                </>
+                            )}
                         </AnimatedButton>
 
                         <div className="mt-8 pt-8 border-t border-slate-100">
@@ -118,8 +189,17 @@ export default function VehicleLookup() {
                                 <div className="bg-primary p-6 rounded-xl text-white flex justify-between items-center shadow-md">
                                     <div>
                                         <p className="text-primary/70 text-xs uppercase font-bold tracking-widest mb-1">Vehicle Identified</p>
-                                        <h2 className="text-2xl font-bold">Toyota Camry (2018)</h2>
-                                        <p className="text-sm opacity-90 mt-1">Plate: PL-582-KN | VIN: 4T1B...9210</p>
+                                        <h2 className="text-2xl font-bold">
+                                            {vehicle ? `${vehicle.make} ${vehicle.model} (${vehicle.year})` : 'Vehicle Details'}
+                                        </h2>
+                                        <p className="text-sm opacity-90 mt-1">
+                                            {vehicle && (
+                                                <>
+                                                    Plate: {vehicle.plateNumber}
+                                                    {vehicle.vin && ` | VIN: ${vehicle.vin.substring(0, 4)}...${vehicle.vin.substring(vehicle.vin.length - 4)}`}
+                                                </>
+                                            )}
+                                        </p>
                                     </div>
                                     <div className="bg-white/20 p-3 rounded-full">
                                         <span className="material-symbols-outlined text-4xl">verified_user</span>
@@ -128,94 +208,75 @@ export default function VehicleLookup() {
 
                                 {/* Compliance Status Grid */}
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    {/* Card 1: Vehicle License - Expired */}
-                                    <div className="bg-white dark:bg-slate-900 border border-red-100 dark:border-red-900/30 p-5 rounded-xl flex flex-col justify-between shadow-sm relative overflow-hidden group">
-                                        <div className="absolute top-0 right-0 w-1 bg-red-500 h-full"></div>
-                                        <div className="flex items-start justify-between mb-4">
-                                            <div className="bg-red-50 dark:bg-red-900/20 p-2 rounded-lg text-red-500">
-                                                <span className="material-symbols-outlined">calendar_today</span>
-                                            </div>
-                                            <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-red-500 bg-red-50 dark:bg-red-900/30 px-2 py-1 rounded">
-                                                <span className="material-symbols-outlined text-xs">error</span> Expired
-                                            </span>
-                                        </div>
-                                        <div>
-                                            <h4 className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase">Vehicle License</h4>
-                                            <p className="text-slate-900 dark:text-white text-lg font-bold mt-1">Renewal Overdue</p>
-                                            <p className="text-red-500 text-xs font-medium mt-1">Expired on Oct 12, 2023</p>
-                                        </div>
-                                    </div>
+                                    {[
+                                        { type: 'VEHICLE_LICENSE', label: 'Vehicle License', icon: 'calendar_today' },
+                                        { type: 'ROAD_WORTHINESS', label: 'Road Worthiness', icon: 'shield' },
+                                        { type: 'INSURANCE', label: 'Insurance', icon: 'description' },
+                                        { type: 'PROOF_OF_OWNERSHIP', label: 'Proof of Ownership', icon: 'badge' }
+                                    ].map((item) => {
+                                        const doc = compliance?.documents.find(d => d.type === item.type);
+                                        const isExpired = doc?.status === 'EXPIRED' || doc?.status === 'NOT_FOUND';
+                                        const isValid = doc?.status === 'VALID';
 
-                                    {/* Card 2: Road Worthiness - Valid */}
-                                    <div className="bg-white dark:bg-slate-900 border border-green-100 dark:border-green-900/30 p-5 rounded-xl flex flex-col justify-between shadow-sm relative overflow-hidden">
-                                        <div className="absolute top-0 right-0 w-1 bg-green-500 h-full"></div>
-                                        <div className="flex items-start justify-between mb-4">
-                                            <div className="bg-green-50 dark:bg-green-900/20 p-2 rounded-lg text-green-500">
-                                                <span className="material-symbols-outlined">shield</span>
+                                        return (
+                                            <div key={item.type} className={`bg-white dark:bg-slate-900 border ${isExpired ? 'border-red-100 dark:border-red-900/30' : 'border-green-100 dark:border-green-900/30'} p-5 rounded-xl flex flex-col justify-between shadow-sm relative overflow-hidden group`}>
+                                                <div className={`absolute top-0 right-0 w-1 ${isExpired ? 'bg-red-500' : 'bg-green-500'} h-full`}></div>
+                                                <div className="flex items-start justify-between mb-4">
+                                                    <div className={`${isExpired ? 'bg-red-50 dark:bg-red-900/20 text-red-500' : 'bg-green-50 dark:bg-green-900/20 text-green-500'} p-2 rounded-lg`}>
+                                                        <span className="material-symbols-outlined">{item.icon}</span>
+                                                    </div>
+                                                    <span className={`flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider ${isExpired ? 'text-red-500 bg-red-50 dark:bg-red-900/30' : 'text-green-500 bg-green-50 dark:bg-green-900/30'} px-2 py-1 rounded`}>
+                                                        <span className="material-symbols-outlined text-xs">{isExpired ? 'error' : 'check_circle'}</span>
+                                                        {doc?.status?.replace(/_/g, ' ') || 'UNKNOWN'}
+                                                    </span>
+                                                </div>
+                                                <div>
+                                                    <h4 className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase">{item.label}</h4>
+                                                    <p className="text-slate-900 dark:text-white text-lg font-bold mt-1">
+                                                        {isExpired ? 'Renewal Overdue' : 'Fully Compliant'}
+                                                    </p>
+                                                    <p className={`${isExpired ? 'text-red-500' : 'text-green-500'} text-xs font-medium mt-1`}>
+                                                        {doc?.expiryDate ? (
+                                                            isExpired
+                                                                ? `Expired on ${new Date(doc.expiryDate).toLocaleDateString()}`
+                                                                : `Expires on ${new Date(doc.expiryDate).toLocaleDateString()}`
+                                                        ) : 'No date available'}
+                                                    </p>
+                                                </div>
                                             </div>
-                                            <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-green-500 bg-green-50 dark:bg-green-900/30 px-2 py-1 rounded">
-                                                <span className="material-symbols-outlined text-xs">check_circle</span> Valid
-                                            </span>
-                                        </div>
-                                        <div>
-                                            <h4 className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase">Road Worthiness</h4>
-                                            <p className="text-slate-900 dark:text-white text-lg font-bold mt-1">Fully Compliant</p>
-                                            <p className="text-green-500 text-xs font-medium mt-1">Expires in 142 days</p>
-                                        </div>
-                                    </div>
-
-                                    {/* Card 3: Insurance - Expired */}
-                                    <div className="bg-white dark:bg-slate-900 border border-red-100 dark:border-red-900/30 p-5 rounded-xl flex flex-col justify-between shadow-sm relative overflow-hidden">
-                                        <div className="absolute top-0 right-0 w-1 bg-red-500 h-full"></div>
-                                        <div className="flex items-start justify-between mb-4">
-                                            <div className="bg-red-50 dark:bg-red-900/20 p-2 rounded-lg text-red-500">
-                                                <span className="material-symbols-outlined">description</span>
-                                            </div>
-                                            <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-red-500 bg-red-50 dark:bg-red-900/30 px-2 py-1 rounded">
-                                                <span className="material-symbols-outlined text-xs">warning</span> Expired
-                                            </span>
-                                        </div>
-                                        <div>
-                                            <h4 className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase">Insurance</h4>
-                                            <p className="text-slate-900 dark:text-white text-lg font-bold mt-1">Third-Party Cover</p>
-                                            <p className="text-red-500 text-xs font-medium mt-1">Expired on Jan 05, 2024</p>
-                                        </div>
-                                    </div>
-
-                                    {/* Card 4: Proof of Ownership - Expired */}
-                                    <div className="bg-white dark:bg-slate-900 border border-red-100 dark:border-red-900/30 p-5 rounded-xl flex flex-col justify-between shadow-sm relative overflow-hidden">
-                                        <div className="absolute top-0 right-0 w-1 bg-red-500 h-full"></div>
-                                        <div className="flex items-start justify-between mb-4">
-                                            <div className="bg-red-50 dark:bg-red-900/20 p-2 rounded-lg text-red-500">
-                                                <span className="material-symbols-outlined">badge</span>
-                                            </div>
-                                            <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-red-500 bg-red-50 dark:bg-red-900/30 px-2 py-1 rounded">
-                                                <span className="material-symbols-outlined text-xs">error</span> Expired
-                                            </span>
-                                        </div>
-                                        <div>
-                                            <h4 className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase">Proof of Ownership</h4>
-                                            <p className="text-slate-900 dark:text-white text-lg font-bold mt-1">Certificate Renewal</p>
-                                            <p className="text-red-500 text-xs font-medium mt-1">Expired on Dec 30, 2023</p>
-                                        </div>
-                                    </div>
+                                        );
+                                    })}
                                 </div>
 
                                 {/* Summary & Action */}
                                 <div className="bg-white p-6 rounded-xl border border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-sm">
                                     <div className="flex items-center gap-4">
-                                        <div className="h-12 w-12 bg-red-50 rounded-full flex items-center justify-center text-red-500">
-                                            <span className="material-symbols-outlined text-3xl">notification_important</span>
+                                        <div className={`h-12 w-12 rounded-full flex items-center justify-center ${compliance?.requiredRenewals?.length ? 'bg-red-50 text-red-500' : 'bg-green-50 text-green-500'}`}>
+                                            <span className="material-symbols-outlined text-3xl">
+                                                {compliance?.requiredRenewals?.length ? 'notification_important' : 'check_circle'}
+                                            </span>
                                         </div>
                                         <div>
-                                            <p className="text-slate-900 font-bold">3 Document Renewals Required</p>
-                                            <p className="text-slate-500 text-sm">Estimated Total: ₦32,500.00</p>
+                                            <p className="text-slate-900 font-bold">
+                                                {compliance?.requiredRenewals?.length
+                                                    ? `${compliance.requiredRenewals.length} Document Renewals Required`
+                                                    : 'Vehicle is Compliant'}
+                                            </p>
+                                            <p className="text-slate-500 text-sm">
+                                                Estimated Total: ₦{(compliance?.totalRenewalCost || 0).toLocaleString()}
+                                            </p>
                                         </div>
                                     </div>
                                     <AnimatedButton
-                                        onClick={() => navigate('/checkout')}
+                                        onClick={() => navigate('/checkout', {
+                                            state: {
+                                                vehicle: vehicle,
+                                                compliance: compliance
+                                            }
+                                        })}
                                         variant="primary"
                                         size="lg"
+                                        disabled={!compliance?.requiredRenewals?.length}
                                     >
                                         Proceed to Payment
                                     </AnimatedButton>

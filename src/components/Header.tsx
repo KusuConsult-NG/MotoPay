@@ -22,9 +22,9 @@ export default function Header() {
                 </nav>
 
                 <div className="flex items-center gap-3">
-                    <button className="hidden sm:flex min-w-[84px] cursor-pointer items-center justify-center rounded-lg h-10 px-4 bg-primary text-white text-sm font-bold transition-all hover:bg-primary/90">
+                    <Link to="/login" className="hidden sm:flex min-w-[84px] cursor-pointer items-center justify-center rounded-lg h-10 px-4 bg-primary text-white text-sm font-bold transition-all hover:bg-primary/90">
                         Login
-                    </button>
+                    </Link>
                     <button className="flex min-w-[84px] cursor-pointer items-center justify-center rounded-lg h-10 px-4 bg-[#e7e9f3] text-[#0d101b] text-sm font-bold transition-all hover:bg-[#d1d5db]">
                         Sign Up
                     </button>

@@ -1,20 +1,135 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import PageTransition from '../components/PageTransition';
 import AnimatedButton from '../components/ui/AnimatedButton';
+import LoadingSpinner from '../components/ui/LoadingSpinner';
+import paymentService from '../services/payment.service';
+import { PAYSTACK_CONFIG } from '../config/api.config';
+import type { Vehicle, VehicleCompliance, PaymentItem } from '../types/api.types';
+
+// Declare Paystack type for popup
+declare global {
+    interface Window {
+        PaystackPop?: any;
+    }
+}
 
 export default function Checkout() {
     const navigate = useNavigate();
+    const location = useLocation();
+    const [isLoading, setIsLoading] = useState(false);
     const [paymentMethod, setPaymentMethod] = useState<'card' | 'bank' | 'ussd'>('card');
+
+    // Get vehicle and compliance data from navigation state
+    const vehicle = (location.state as any)?.vehicle as Vehicle | undefined;
+    const compliance = (location.state as any)?.compliance as VehicleCompliance | undefined;
+
+    // Card details (kept for UI, but Paystack will handle actual payment)
     const [cardDetails, setCardDetails] = useState({
         number: '',
         expiry: '',
         cvv: ''
     });
 
-    const handlePayment = () => {
-        // In a real app, this would process the payment
-        navigate('/receipt');
+    // Email for guest payments
+    const [email, setEmail] = useState('');
+    const [phoneNumber, setPhoneNumber] = useState('');
+
+    useEffect(() => {
+        // Redirect if no vehicle data
+        if (!vehicle) {
+            toast.error('No vehicle data found. Please start from Vehicle Lookup.');
+            navigate('/lookup');
+        }
+    }, [vehicle, navigate]);
+
+    const handlePayment = async () => {
+        if (!vehicle || !compliance) {
+            toast.error('Missing vehicle or compliance data');
+            return;
+        }
+
+        if (!email.trim()) {
+            toast.error('Please enter your email address');
+            return;
+        }
+
+        setIsLoading(true);
+
+        try {
+            // Prepare payment items from compliance required renewals
+            const items: PaymentItem[] = compliance.requiredRenewals.map(doc => ({
+                type: doc.type,
+                description: `${doc.type.replace(/_/g, ' ')} Renewal`,
+                amount: doc.amount || 0,
+                quantity: 1,
+            }));
+
+            // Initialize payment via backend API
+            const response = await paymentService.initializePayment({
+                vehicleId: vehicle.id,
+                items,
+                email: email.trim(),
+                phoneNumber: phoneNumber.trim() || undefined,
+                metadata: {
+                    vehiclePlate: vehicle.plateNumber,
+                    vehicleMake: vehicle.make,
+                    vehicleModel: vehicle.model,
+                },
+            });
+
+            if (response.success && response.data) {
+                const { reference, authorizationUrl, amount } = response.data;
+
+                // Initialize Paystack Popup
+                if (window.PaystackPop) {
+                    const handler = window.PaystackPop.setup({
+                        key: PAYSTACK_CONFIG.PUBLIC_KEY,
+                        email: email.trim(),
+                        amount: amount * 100, // Convert to kobo
+                        ref: reference,
+                        onClose: () => {
+                            toast.error('Payment cancelled');
+                            setIsLoading(false);
+                        },
+                        callback: async (paystackResponse: any) => {
+                            // Verify payment with backend
+                            try {
+                                const verifyResponse = await paymentService.verifyPayment(reference);
+
+                                if (verifyResponse.success && verifyResponse.data?.status === 'SUCCESS') {
+                                    toast.success('Payment successful!');
+                                    navigate('/receipt', {
+                                        state: {
+                                            transactionId: verifyResponse.data.transaction.id,
+                                            transaction: verifyResponse.data.transaction
+                                        }
+                                    });
+                                } else {
+                                    toast.error('Payment verification failed');
+                                    setIsLoading(false);
+                                }
+                            } catch (error) {
+                                console.error('Payment verification error:', error);
+                                setIsLoading(false);
+                            }
+                        },
+                    });
+                    handler.openIframe();
+                } else {
+                    // Fallback: redirect to authorization URL
+                    window.location.href = authorizationUrl;
+                }
+            } else {
+                toast.error('Failed to initialize payment');
+                setIsLoading(false);
+            }
+        } catch (error: any) {
+            console.error('Payment initialization error:', error);
+            setIsLoading(false);
+            // Error toast handled by API interceptor
+        }
     };
 
     return (
@@ -34,6 +149,34 @@ export default function Checkout() {
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
                         {/* Left Column: Payment Methods */}
                         <div className="lg:col-span-7 flex flex-col gap-6">
+                            {/* Contact Information Section */}
+                            <section className="bg-white p-6 rounded-xl border border-[#cfd3e7] shadow-sm">
+                                <h3 className="text-xl font-bold mb-6 text-[#0d101b]">Contact Information</h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <label className="flex flex-col">
+                                        <p className="text-[#0d101b] text-sm font-semibold pb-2">Email Address *</p>
+                                        <input
+                                            className="form-input w-full rounded-lg text-[#0d101b] border border-[#cfd3e7] bg-[#f8f9fc] h-12 px-4 text-sm focus:border-primary focus:ring-0"
+                                            placeholder="example@email.com"
+                                            type="email"
+                                            value={email}
+                                            onChange={(e) => setEmail(e.target.value)}
+                                            required
+                                        />
+                                    </label>
+                                    <label className="flex flex-col">
+                                        <p className="text-[#0d101b] text-sm font-semibold pb-2">Phone Number</p>
+                                        <input
+                                            className="form-input w-full rounded-lg text-[#0d101b] border border-[#cfd3e7] bg-[#f8f9fc] h-12 px-4 text-sm focus:border-primary focus:ring-0"
+                                            placeholder="+234 800 000 0000"
+                                            type="tel"
+                                            value={phoneNumber}
+                                            onChange={(e) => setPhoneNumber(e.target.value)}
+                                        />
+                                    </label>
+                                </div>
+                            </section>
+
                             <section className="bg-white p-6 rounded-xl border border-[#cfd3e7] shadow-sm">
                                 <div className="flex items-center justify-between mb-6">
                                     <h3 className="text-xl font-bold text-[#0d101b]">Select Payment Method</h3>
@@ -168,39 +311,62 @@ export default function Checkout() {
                             <div className="sticky top-10 bg-white p-8 rounded-xl border border-[#cfd3e7] shadow-lg">
                                 <h3 className="text-xl font-bold mb-6 text-[#0d101b]">Transaction Summary</h3>
 
-                                <div className="space-y-4 mb-8">
-                                    <div className="flex justify-between">
-                                        <span className="text-[#4c599a] text-sm">Vehicle License Renewal</span>
-                                        <span className="text-[#0d101b] text-sm font-semibold">₦12,500.00</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <div className="flex flex-col">
-                                            <span className="text-[#4c599a] text-sm">Statutory Insurance</span>
-                                            <span className="text-[10px] text-primary font-bold uppercase tracking-tight">Standard Rate</span>
+                                {vehicle && compliance ? (
+                                    <>
+                                        {/* Vehicle Info */}
+                                        <div className="mb-6 pb-4 border-b border-[#cfd3e7]">
+                                            <p className="text-xs text-[#4c599a] uppercase font-semibold mb-2">Vehicle</p>
+                                            <p className="text-sm font-bold text-[#0d101b]">{vehicle.make} {vehicle.model} ({vehicle.year})</p>
+                                            <p className="text-xs text-[#4c599a]">Plate: {vehicle.plateNumber}</p>
                                         </div>
-                                        <span className="text-[#0d101b] text-sm font-semibold">₦5,000.00</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span className="text-[#4c599a] text-sm">Platform Fee</span>
-                                        <span className="text-[#0d101b] text-sm font-semibold">₦250.00</span>
-                                    </div>
-                                </div>
 
-                                <div className="border-t-2 border-dashed border-[#cfd3e7] my-6 pt-6">
-                                    <div className="flex justify-between items-end">
-                                        <p className="text-[#4c599a] font-bold text-sm uppercase">Total Payable</p>
-                                        <p className="text-3xl font-black text-primary">₦17,750.00</p>
+                                        {/* Renewal Items */}
+                                        <div className="space-y-4 mb-8">
+                                            {compliance.requiredRenewals.map((doc, index) => (
+                                                <div key={index} className="flex justify-between">
+                                                    <span className="text-[#4c599a] text-sm">
+                                                        {doc.type.replace(/_/g, ' ')}
+                                                    </span>
+                                                    <span className="text-[#0d101b] text-sm font-semibold">
+                                                        ₦{(doc.amount || 0).toLocaleString()}
+                                                    </span>
+                                                </div>
+                                            ))}
+                                        </div>
+
+                                        <div className="border-t-2 border-dashed border-[#cfd3e7] my-6 pt-6">
+                                            <div className="flex justify-between items-end">
+                                                <p className="text-[#4c599a] font-bold text-sm uppercase">Total Payable</p>
+                                                <p className="text-3xl font-black text-primary">
+                                                    ₦{(compliance.totalRenewalCost || 0).toLocaleString()}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <div className="text-center py-8">
+                                        <p className="text-[#4c599a]">No transaction data available</p>
                                     </div>
-                                </div>
+                                )}
 
                                 <AnimatedButton
                                     onClick={handlePayment}
                                     variant="primary"
                                     size="lg"
                                     className="w-full flex items-center justify-center gap-2 mb-4"
+                                    disabled={isLoading || !vehicle || !compliance}
                                 >
-                                    Pay Now
-                                    <span className="material-symbols-outlined text-xl">arrow_forward</span>
+                                    {isLoading ? (
+                                        <>
+                                            <LoadingSpinner />
+                                            <span>Processing...</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            Pay Now
+                                            <span className="material-symbols-outlined text-xl">arrow_forward</span>
+                                        </>
+                                    )}
                                 </AnimatedButton>
 
                                 <div className="flex flex-col items-center gap-2 text-center">
