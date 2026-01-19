@@ -1,25 +1,25 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { format } from 'date-fns';
+import toast from 'react-hot-toast';
+import adminService, { type DashboardMetrics, type AdminTransaction, type CollectionData } from '../services/admin.service';
+import { authService } from '../services/auth.service';
+import LoadingSpinner from '../components/ui/LoadingSpinner';
 
 export default function AdminDashboard() {
+    const navigate = useNavigate();
     const [timeRange, setTimeRange] = useState<'daily' | 'weekly' | 'monthly'>('daily');
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState('all');
     const [page, setPage] = useState(1);
+    const [isLoading, setIsLoading] = useState(true);
+    const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
+    const [revenueData, setRevenueData] = useState<CollectionData[]>([]);
+    const [allTransactions, setAllTransactions] = useState<AdminTransaction[]>([]);
+    const [totalTransactions, setTotalTransactions] = useState(0);
 
-    // Mock revenue trend data
-    const revenueData = [
-        { date: 'Jan 11', revenue: 145000, transactions: 42 },
-        { date: 'Jan 12', revenue: 178000, transactions: 51 },
-        { date: 'Jan 13', revenue: 192000, transactions: 58 },
-        { date: 'Jan 14', revenue: 165000, transactions: 47 },
-        { date: 'Jan 15', revenue: 210000, transactions: 63 },
-        { date: 'Jan 16', revenue: 225000, transactions: 71 },
-        { date: 'Jan 17', revenue: 198000, transactions: 59 }
-    ];
-
-    // Transaction type breakdown
+    // Transaction type breakdown - could also come from API
     const transactionTypes = [
         { name: 'Private Vehicle', value: 45, color: '#1337ec' },
         { name: 'Commercial', value: 30, color: '#008751' },
@@ -27,44 +27,92 @@ export default function AdminDashboard() {
         { name: 'Permits', value: 10, color: '#8b5cf6' }
     ];
 
-    // Mock transaction data
-    const allTransactions = [
-        { id: 'TXN-88721', date: '2024-01-17 14:32', vehicle: 'PL-582-KN', owner: 'Yakubu Gani', type: 'Private Renewal', amount: 17750, status: 'completed', method: 'Card' },
-        { id: 'TXN-88719', date: '2024-01-17 14:18', vehicle: 'JOS-442-AB', owner: 'Sarah Ibrahim', type: 'Commercial', amount: 32500, status: 'completed', method: 'Transfer' },
-        { id: 'TXN-88715', date: '2024-01-17 13:45', vehicle: 'BKK-119-QR', owner: 'Emmanuel Pwajok', type: 'Insurance', amount: 5000, status: 'pending', method: 'USSD' },
-        { id: 'TXN-88712', date: '2024-01-17 13:12', vehicle: 'KRG-902-XP', owner: 'Fatima Bala', type: 'Permit Renewal', amount: 7500, status: 'completed', method: 'Card' },
-        { id: 'TXN-88708', date: '2024-01-17 12:55', vehicle: 'PL-22-H01', owner: 'Daniel Dalyop', type: 'Private Renewal', amount: 17750, status: 'failed', method: 'Card' },
-        { id: 'TXN-88705', date: '2024-01-17 12:30', vehicle: 'JOS-338-PL', owner: 'Grace Nanmwa', type: 'Commercial', amount: 32500, status: 'completed', method: 'Transfer' },
-        { id: 'TXN-88697', date: '2024-01-17 11:42', vehicle: 'ABC-777-XY', owner: 'John Marcus', type: 'Insurance', amount: 5000, status: 'completed', method: 'Card' },
-        { id: 'TXN-88691', date: '2024-01-17 11:05', vehicle: 'DEF-111-ZZ', owner: 'Mary Dung', type: 'Private Renewal', amount: 17750, status: 'completed', method: 'Transfer' }
-    ];
+    useEffect(() => {
+        loadDashboardData();
+    }, [timeRange]);
 
-    const filteredTransactions = allTransactions.filter(txn => {
-        const matchesSearch = searchQuery === '' ||
-            txn.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            txn.vehicle.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            txn.owner.toLowerCase().includes(searchQuery.toLowerCase());
-        const matchesStatus = statusFilter === 'all' || txn.status === statusFilter;
-        return matchesSearch && matchesStatus;
-    });
+    useEffect(() => {
+        loadTransactions();
+    }, [page, searchQuery, statusFilter]);
+
+    const loadDashboardData = async () => {
+        setIsLoading(true);
+        try {
+            // Load metrics
+            const metricsResponse = await adminService.getMetrics(timeRange);
+            if (metricsResponse.success && metricsResponse.data) {
+                setMetrics(metricsResponse.data);
+            }
+
+            // Load revenue collections
+            const collectionsResponse = await adminService.getCollections(timeRange);
+            if (collectionsResponse.success && collectionsResponse.data) {
+                setRevenueData(collectionsResponse.data);
+            }
+        } catch (error) {
+            console.error('Failed to load dashboard data:', error);
+            toast.error('Failed to load dashboard data');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const loadTransactions = async () => {
+        try {
+            const response = await adminService.getTransactions({
+                searchQuery,
+                status: statusFilter as any,
+                page,
+                limit: 5
+            });
+            if (response.success && response.data) {
+                setAllTransactions(response.data.transactions);
+                setTotalTransactions(response.data.total);
+            }
+        } catch (error) {
+            console.error('Failed to load transactions:', error);
+        }
+    };
+
+    const handleLogout = () => {
+        authService.logout();
+        navigate('/login');
+    };
+
+    const exportToCSV = async () => {
+        try {
+            const response = await adminService.exportData('transactions', { searchQuery, status: statusFilter });
+            if (response.success && response.data?.url) {
+                window.open(response.data.url, '_blank');
+                toast.success('Export initiated!');
+            }
+        } catch (error) {
+            // Fallback to client-side CSV generation
+            const headers = ['Transaction ID', 'Date', 'Vehicle', 'Owner', 'Type', 'Amount', 'Status', 'Method'];
+            const rows = allTransactions.map(txn => [
+                txn.id, txn.date, txn.vehicle, txn.owner, txn.type, txn.amount, txn.status, txn.method
+            ]);
+            const csv = [headers, ...rows].map(row => row.join(',')).join('\n');
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `transactions_${format(new Date(), 'yyyy-MM-dd')}.csv`;
+            a.click();
+            toast.success('CSV downloaded!');
+        }
+    };
 
     const itemsPerPage = 5;
-    const paginatedTransactions = filteredTransactions.slice((page - 1) * itemsPerPage, page * itemsPerPage);
-    const totalPages = Math.ceil(filteredTransactions.length / itemsPerPage);
+    const totalPages = Math.ceil(totalTransactions / itemsPerPage);
 
-    const exportToCSV = () => {
-        const headers = ['Transaction ID', 'Date', 'Vehicle', 'Owner', 'Type', 'Amount', 'Status', 'Method'];
-        const rows = filteredTransactions.map(txn => [
-            txn.id, txn.date, txn.vehicle, txn.owner, txn.type, txn.amount, txn.status, txn.method
-        ]);
-        const csv = [headers, ...rows].map(row => row.join(',')).join('\\n');
-        const blob = new Blob([csv], { type: 'text/csv' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `transactions_${format(new Date(), 'yyyy-MM-dd')}.csv`;
-        a.click();
-    };
+    if (isLoading) {
+        return (
+            <div className="flex items-center justify-center h-screen">
+                <LoadingSpinner />
+            </div>
+        );
+    }
 
     return (
         <div className="flex h-screen overflow-hidden bg-background-light dark:bg-background-dark">
@@ -102,7 +150,10 @@ export default function AdminDashboard() {
                 </nav>
 
                 <div className="p-4 border-t border-[#e7e9f3] dark:border-[#2d324a]">
-                    <button className="w-full flex items-center gap-3 px-3 py-3 text-[#4c599a] hover:bg-background-light dark:hover:bg-[#2d324a] rounded-lg">
+                    <button
+                        onClick={handleLogout}
+                        className="w-full flex items-center gap-3 px-3 py-3 text-[#4c599a] hover:bg-background-light dark:hover:bg-[#2d324a] rounded-lg"
+                    >
                         <span className="material-symbols-outlined">logout</span>
                         <p className="text-sm font-medium">Logout</p>
                     </button>
@@ -143,8 +194,8 @@ export default function AdminDashboard() {
                                             key={range}
                                             onClick={() => setTimeRange(range as any)}
                                             className={`px-2 py-1 text-[10px] font-bold uppercase rounded ${timeRange === range
-                                                    ? 'bg-primary text-white'
-                                                    : 'text-[#4c599a] hover:bg-gray-100 dark:hover:bg-[#2a2f45]'
+                                                ? 'bg-primary text-white'
+                                                : 'text-[#4c599a] hover:bg-gray-100 dark:hover:bg-[#2a2f45]'
                                                 }`}
                                         >
                                             {range[0]}
@@ -152,31 +203,31 @@ export default function AdminDashboard() {
                                     ))}
                                 </div>
                             </div>
-                            <p className="text-3xl font-black dark:text-white">₦1.31M</p>
+                            <p className="text-3xl font-black dark:text-white">₦{((metrics?.totalRevenue || 0) / 1000000).toFixed(2)}M</p>
                             <div className="flex items-center gap-1 text-green-600 text-xs font-bold mt-2">
                                 <span className="material-symbols-outlined text-sm">trending_up</span>
-                                <span>+12.5% from last {timeRange === 'daily' ? 'day' : timeRange === 'weekly' ? 'week' : 'month'}</span>
+                                <span>+{metrics?.revenueChange || 0}% from last {timeRange === 'daily' ? 'day' : timeRange === 'weekly' ? 'week' : 'month'}</span>
                             </div>
                         </div>
 
                         <div className="bg-white dark:bg-[#1a1e36] p-6 rounded-xl border border-[#cfd3e7] dark:border-[#2a2f45] shadow-sm">
                             <p className="text-[#4c599a] text-sm font-medium mb-2">Total Transactions</p>
-                            <p className="text-3xl font-black dark:text-white">391</p>
+                            <p className="text-3xl font-black dark:text-white">{metrics?.totalTransactions || 0}</p>
                             <div className="flex items-center gap-1 text-green-600 text-xs font-bold mt-2">
                                 <span className="material-symbols-outlined text-sm">trending_up</span>
-                                <span>+8.3% increase</span>
+                                <span>+{metrics?.transactionChange || 0}% increase</span>
                             </div>
                         </div>
 
                         <div className="bg-white dark:bg-[#1a1e36] p-6 rounded-xl border border-[#cfd3e7] dark:border-[#2a2f45] shadow-sm">
                             <p className="text-[#4c599a] text-sm font-medium mb-2">Avg Transaction</p>
-                            <p className="text-3xl font-black dark:text-white">₦19,450</p>
+                            <p className="text-3xl font-black dark:text-white">₦{metrics?.averageTransaction?.toLocaleString() || '0'}</p>
                             <p className="text-[#4c599a] text-xs mt-2">Per vehicle renewal</p>
                         </div>
 
                         <div className="bg-white dark:bg-[#1a1e36] p-6 rounded-xl border border-[#cfd3e7] dark:border-[#2a2f45] shadow-sm">
                             <p className="text-[#4c599a] text-sm font-medium mb-2">Success Rate</p>
-                            <p className="text-3xl font-black text-green-600">96.2%</p>
+                            <p className="text-3xl font-black text-green-600">{metrics?.successRate?.toFixed(1) || '0'}%</p>
                             <div className="flex items-center gap-1 text-red-600 text-xs font-bold mt-2">
                                 <span className="material-symbols-outlined text-sm">trending_down</span>
                                 <span>-1.2% from target</span>
@@ -286,7 +337,7 @@ export default function AdminDashboard() {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-[#e7e9f3] dark:divide-[#2a2f45] text-sm">
-                                    {paginatedTransactions.map((txn) => (
+                                    {allTransactions.map((txn) => (
                                         <tr key={txn.id} className="hover:bg-background-light/50 dark:hover:bg-[#2a2f45]/20">
                                             <td className="px-6 py-4 font-mono text-xs text-primary">{txn.id}</td>
                                             <td className="px-6 py-4 text-[#4c599a]">{txn.date}</td>
@@ -326,7 +377,7 @@ export default function AdminDashboard() {
                         {/* Pagination */}
                         <div className="px-6 py-4 border-t border-[#e7e9f3] dark:border-[#2a2f45] flex items-center justify-between">
                             <p className="text-sm text-[#4c599a]">
-                                Showing {(page - 1) * itemsPerPage + 1} to {Math.min(page * itemsPerPage, filteredTransactions.length)} of {filteredTransactions.length} transactions
+                                Showing {(page - 1) * itemsPerPage + 1} to {Math.min(page * itemsPerPage, totalTransactions)} of {totalTransactions} transactions
                             </p>
                             <div className="flex gap-2">
                                 <button
@@ -341,8 +392,8 @@ export default function AdminDashboard() {
                                         key={i + 1}
                                         onClick={() => setPage(i + 1)}
                                         className={`px-3 py-1.5 rounded-lg text-sm font-bold ${page === i + 1
-                                                ? 'bg-primary text-white'
-                                                : 'border border-[#e7e9f3] dark:border-[#2a2f45] hover:bg-background-light dark:hover:bg-[#2a2f45]'
+                                            ? 'bg-primary text-white'
+                                            : 'border border-[#e7e9f3] dark:border-[#2a2f45] hover:bg-background-light dark:hover:bg-[#2a2f45]'
                                             }`}
                                     >
                                         {i + 1}

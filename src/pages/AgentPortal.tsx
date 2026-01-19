@@ -1,42 +1,67 @@
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
+import agentService, { type AgentTransaction, type AgentDashboard } from '../services/agent.service';
+import { authService } from '../services/auth.service';
+import LoadingSpinner from '../components/ui/LoadingSpinner';
+
 export default function AgentPortal() {
-    const transactions = [
-        {
-            id: 'TXN-77291',
-            vehicle: 'JOS-442-AB',
-            vehicleType: 'Toyota Hilux',
-            owner: 'Alhaji Musa Bello',
-            service: 'Annual Road Worthiness',
-            amount: 4500,
-            status: 'completed'
-        },
-        {
-            id: 'TXN-77304',
-            vehicle: 'BKK-119-QR',
-            vehicleType: 'Honda Accord',
-            owner: 'Sarah Pam',
-            service: 'Third Party Insurance',
-            amount: 5000,
-            status: 'pending'
-        },
-        {
-            id: 'TXN-77318',
-            vehicle: 'PL-22-H01',
-            vehicleType: 'Bajaj RE',
-            owner: 'Emmanuel Duru',
-            service: 'Commercial Levy',
-            amount: 2200,
-            status: 'completed'
-        },
-        {
-            id: 'TXN-77322',
-            vehicle: 'KRG-902-XP',
-            vehicleType: 'Volkswagen Golf',
-            owner: 'Fatima Ibrahim',
-            service: 'Hackney Permit',
-            amount: 3500,
-            status: 'pending'
+    const navigate = useNavigate();
+    const [dashboard, setDashboard] = useState<AgentDashboard | null>(null);
+    const [transactions, setTransactions] = useState<AgentTransaction[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [user, setUser] = useState<any>(null);
+
+    useEffect(() => {
+        loadDashboardData();
+        loadUserInfo();
+    }, []);
+
+    const loadUserInfo = async () => {
+        try {
+            const response = await authService.getCurrentUser();
+            if (response.success && response.data) {
+                setUser(response.data);
+            }
+        } catch (error) {
+            console.error('Failed to load user info:', error);
         }
-    ];
+    };
+
+    const loadDashboardData = async () => {
+        setIsLoading(true);
+        try {
+            // Load dashboard metrics
+            const dashboardResponse = await agentService.getDashboard();
+            if (dashboardResponse.success && dashboardResponse.data) {
+                setDashboard(dashboardResponse.data);
+            }
+
+            // Load recent transactions
+            const transactionsResponse = await agentService.getTransactions({ limit: 4 });
+            if (transactionsResponse.success && transactionsResponse.data) {
+                setTransactions(transactionsResponse.data.transactions);
+            }
+        } catch (error) {
+            console.error('Failed to load dashboard data:', error);
+            toast.error('Failed to load dashboard data');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleLogout = () => {
+        authService.logout();
+        navigate('/login');
+    };
+
+    if (isLoading) {
+        return (
+            <div className="flex items-center justify-center h-screen">
+                <LoadingSpinner />
+            </div>
+        );
+    }
 
     return (
         <div className="flex h-screen overflow-hidden bg-background-light dark:bg-background-dark">
@@ -106,8 +131,8 @@ export default function AgentPortal() {
                         <div className="h-8 w-[1px] bg-[#e7e9f3] dark:border-[#2d324a]"></div>
                         <div className="flex items-center gap-3">
                             <div className="text-right">
-                                <p className="text-sm font-bold dark:text-white">John Doe</p>
-                                <p className="text-[10px] text-primary font-bold uppercase tracking-wider">PM-98234-A</p>
+                                <p className="text-sm font-bold dark:text-white">{user?.firstName || 'Agent'} {user?.lastName || 'User'}</p>
+                                <p className="text-[10px] text-primary font-bold uppercase tracking-wider">{user?.email || ''}</p>
                             </div>
                             <div
                                 className="size-10 rounded-full bg-cover bg-center border-2 border-primary/20"
@@ -117,7 +142,10 @@ export default function AgentPortal() {
                                 }}
                             />
                         </div>
-                        <button className="bg-primary text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-primary/90 transition-colors">
+                        <button
+                            onClick={handleLogout}
+                            className="bg-primary text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-primary/90 transition-colors"
+                        >
                             Logout
                         </button>
                     </div>
@@ -145,10 +173,10 @@ export default function AgentPortal() {
                                 <p className="text-[#4c599a] dark:text-[#a0a8cc] text-sm font-medium">Today's Renewals</p>
                                 <span className="material-symbols-outlined text-primary/40">calendar_today</span>
                             </div>
-                            <p className="text-[#0d101b] dark:text-white text-3xl font-black">14</p>
+                            <p className="text-[#0d101b] dark:text-white text-3xl font-black">{dashboard?.todayRenewals || 0}</p>
                             <div className="flex items-center gap-1 text-[#07883f] text-xs font-bold">
                                 <span className="material-symbols-outlined text-sm">trending_up</span>
-                                <span>+15% from yesterday</span>
+                                <span>+{dashboard?.todayChange || 0}% from yesterday</span>
                             </div>
                         </div>
                         <div className="bg-white dark:bg-[#1a1e36] p-6 rounded-xl border border-[#cfd3e7] dark:border-[#2d324a] flex flex-col gap-2">
@@ -156,7 +184,7 @@ export default function AgentPortal() {
                                 <p className="text-[#4c599a] dark:text-[#a0a8cc] text-sm font-medium">Pending Actions</p>
                                 <span className="material-symbols-outlined text-orange-400">pending_actions</span>
                             </div>
-                            <p className="text-[#0d101b] dark:text-white text-3xl font-black">3</p>
+                            <p className="text-[#0d101b] dark:text-white text-3xl font-black">{dashboard?.pendingActions || 0}</p>
                             <p className="text-[#4c599a] dark:text-[#a0a8cc] text-xs font-medium italic">Requires document verification</p>
                         </div>
                         <div className="bg-white dark:bg-[#1a1e36] p-6 rounded-xl border border-[#cfd3e7] dark:border-[#2d324a] flex flex-col gap-2">
@@ -164,10 +192,10 @@ export default function AgentPortal() {
                                 <p className="text-[#4c599a] dark:text-[#a0a8cc] text-sm font-medium">Total Commission (Monthly)</p>
                                 <span className="material-symbols-outlined text-green-500">payments</span>
                             </div>
-                            <p className="text-[#0d101b] dark:text-white text-3xl font-black">₦12,500.00</p>
+                            <p className="text-[#0d101b] dark:text-white text-3xl font-black">₦{dashboard?.monthlyCommission?.toLocaleString() || '0'}.00</p>
                             <div className="flex items-center gap-1 text-[#e73c08] text-xs font-bold">
                                 <span className="material-symbols-outlined text-sm">trending_down</span>
-                                <span>-2% from last month</span>
+                                <span>{dashboard?.commissionChange || 0}% from last month</span>
                             </div>
                         </div>
                     </div>
