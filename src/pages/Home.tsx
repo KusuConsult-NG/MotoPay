@@ -43,7 +43,7 @@ export default function Home() {
                                     Private Vehicle Renewal
                                 </AnimatedButton>
                                 <AnimatedButton
-                                    onClick={() => navigate('/commercial')}
+                                    onClick={() => navigate('/lookup')}
                                     variant="secondary"
                                     size="lg"
                                     className="flex-1 sm:flex-none min-w-[200px]"
