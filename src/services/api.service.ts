@@ -97,11 +97,19 @@ apiClient.interceptors.response.use(
         // Handle different error status codes
         switch (status) {
             case 401:
-                // Unauthorized - Clear tokens and redirect to login (if needed)
-                toast.error('Session expired. Please log in again.');
-                tokenManager.clearTokens();
-                // Optionally redirect to login page
-                // window.location.href = '/login';
+                // Unauthorized - Check if this is a login attempt
+                const isLoginAttempt = error.config?.url?.includes('/auth/login');
+
+                if (isLoginAttempt) {
+                    // Show the actual backend error for login failures
+                    toast.error(data?.message || 'Invalid email or password.');
+                } else {
+                    // Session expired for authenticated requests
+                    toast.error('Session expired. Please log in again.');
+                    tokenManager.clearTokens();
+                    // Optionally redirect to login page
+                    // window.location.href = '/login';
+                }
                 break;
 
             case 403:
