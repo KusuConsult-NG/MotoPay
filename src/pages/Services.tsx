@@ -80,21 +80,24 @@ export default function Services() {
     ];
 
     useEffect(() => {
+        // Initialize with static data immediately
+        setServices(staticServices);
+        setIsLoading(false);
+
+        // Try to fetch from API with timeout
         const fetchServices = async () => {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
+
             try {
                 const response = await contentService.getServices();
-                if (response.success && response.data) {
+                clearTimeout(timeoutId);
+
+                if (response.success && response.data && response.data.length > 0) {
                     setServices(response.data);
-                } else {
-                    // Use static fallback
-                    setServices(staticServices);
                 }
             } catch (error) {
-                console.error('Failed to fetch services, using static data:', error);
-                // Use static fallback on error
-                setServices(staticServices);
-            } finally {
-                setIsLoading(false);
+                console.log('Using static services data');
             }
         };
 

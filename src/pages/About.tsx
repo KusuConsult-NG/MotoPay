@@ -36,16 +36,23 @@ export default function About() {
     };
 
     useEffect(() => {
+        // Set not loading immediately to show static content
+        setIsLoading(false);
+
+        // Try to fetch from API with timeout
         const fetchAbout = async () => {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 3000);
+
             try {
                 const response = await contentService.getAboutSections();
+                clearTimeout(timeoutId);
+
                 if (response.success && response.data && response.data.length > 0) {
                     setSections(response.data);
                 }
             } catch (error) {
-                console.error('Failed to fetch about sections, using static data:', error);
-            } finally {
-                setIsLoading(false);
+                console.log('Using static about content');
             }
         };
 

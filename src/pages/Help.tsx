@@ -142,30 +142,32 @@ export default function Help() {
     ];
 
     useEffect(() => {
+        // Initialize with static data immediately
+        setFaqs(staticFaqs);
+        setCategories(staticCategories);
+        setIsLoading(false);
+
+        // Try to fetch from API with timeout
         const fetchHelpContent = async () => {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 3000);
+
             try {
                 const [faqsResponse, categoriesResponse] = await Promise.all([
                     contentService.getFAQs(),
                     contentService.getHelpCategories(),
                 ]);
+                clearTimeout(timeoutId);
 
                 if (faqsResponse.success && faqsResponse.data && faqsResponse.data.length > 0) {
                     setFaqs(faqsResponse.data);
-                } else {
-                    setFaqs(staticFaqs);
                 }
 
                 if (categoriesResponse.success && categoriesResponse.data && categoriesResponse.data.length > 0) {
                     setCategories(categoriesResponse.data);
-                } else {
-                    setCategories(staticCategories);
                 }
             } catch (error) {
-                console.error('Failed to fetch help content, using static data:', error);
-                setFaqs(staticFaqs);
-                setCategories(staticCategories);
-            } finally {
-                setIsLoading(false);
+                console.log('Using static help content');
             }
         };
 
