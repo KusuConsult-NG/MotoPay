@@ -33,8 +33,14 @@ export default function ProtectedRoute({
     if (roles && roles.length > 0) {
         if (!roles.includes(user.role)) {
             // Redirect to appropriate page based on user role
-            const defaultPage = user.role === 'AGENT' ? '/agent' : '/admin';
-            return <Navigate to={defaultPage} replace />;
+            if (user.role === 'AGENT') {
+                return <Navigate to="/agent" replace />;
+            } else if (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN') {
+                return <Navigate to="/admin" replace />;
+            } else {
+                // PUBLIC or other roles go to home
+                return <Navigate to="/" replace />;
+            }
         }
     }
 
