@@ -31,7 +31,7 @@ export default function Footer() {
                     <h4 className="font-bold text-[#0d101b] dark:text-white uppercase tracking-wider text-xs">Services</h4>
                     <div className="flex flex-col gap-4 text-sm text-[#4c599a] dark:text-white/60">
                         <Link className="hover:text-primary transition-colors" to="/lookup">Private Renewals</Link>
-                        <Link className="hover:text-primary transition-colors" to="/commercial">Commercial Permits</Link>
+                        <Link className="hover:text-primary transition-colors" to="/lookup">Commercial Permits</Link>
                         <Link className="hover:text-primary transition-colors" to="/lookup">Insurance Verification</Link>
                         <Link className="hover:text-primary transition-colors" to="/lookup">Plate Number Search</Link>
                     </div>
