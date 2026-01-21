@@ -32,7 +32,15 @@ export const authService = {
      * Register new user
      */
     async register(data: RegisterRequest): Promise<ApiResponse<User>> {
-        return apiService.post<User>(API_ENDPOINTS.AUTH.REGISTER, data);
+        // Transform the data to match backend schema
+        const backendData = {
+            email: data.email,
+            password: data.password,
+            fullName: `${data.firstName} ${data.lastName}`.trim(),
+            phoneNumber: data.phoneNumber,
+        };
+
+        return apiService.post<User>(API_ENDPOINTS.AUTH.REGISTER, backendData);
     },
 
     /**
