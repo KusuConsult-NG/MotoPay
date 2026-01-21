@@ -29,7 +29,91 @@ export default function VehicleLookup() {
         try {
             // Construct the request payload based on search type
             const lookupPayload: any = {};
-            const trimmedId = vehicleId.trim();
+            const trimmedId = vehicleId.trim().toUpperCase();
+
+            // Mock data for demo purposes
+            const mockVehicles: Record<string, any> = {
+                'PL-582-KN': {
+                    vehicle: {
+                        id: '1',
+                        plateNumber: 'PL-582-KN',
+                        chassisNumber: '1HGCG2253YA120412',
+                        make: 'Toyota',
+                        model: 'Camry',
+                        year: 2018,
+                        ownerName: 'Musa Ibrahim Chollom',
+                        tin: '1023456789',
+                        vehicleType: 'PRIVATE'
+                    },
+                    compliance: {
+                        documents: [
+                            { type: 'VEHICLE_LICENSE', status: 'ACTIVE', expiryDate: '2025-12-31' },
+                            { type: 'ROAD_WORTHINESS', status: 'ACTIVE', expiryDate: '2025-06-30' },
+                            { type: 'INSURANCE', status: 'ACTIVE', expiryDate: '2025-08-15' },
+                            { type: 'PROOF_OF_OWNERSHIP', status: 'ACTIVE', expiryDate: '2030-01-01' }
+                        ],
+                        requiredRenewals: [],
+                        totalRenewalCost: 0
+                    }
+                },
+                'PL-123-AB': {
+                    vehicle: {
+                        id: '2',
+                        plateNumber: 'PL-123-AB',
+                        chassisNumber: '2T1BURHE8JC012345',
+                        make: 'Honda',
+                        model: 'Accord',
+                        year: 2020,
+                        ownerName: 'John Danladi',
+                        tin: '2034567890',
+                        vehicleType: 'PRIVATE'
+                    },
+                    compliance: {
+                        documents: [
+                            { type: 'VEHICLE_LICENSE', status: 'EXPIRED', expiryDate: '2024-12-31' },
+                            { type: 'ROAD_WORTHINESS', status: 'EXPIRED', expiryDate: '2024-11-30' },
+                            { type: 'INSURANCE', status: 'ACTIVE', expiryDate: '2025-09-20' },
+                            { type: 'PROOF_OF_OWNERSHIP', status: 'ACTIVE', expiryDate: '2030-01-01' }
+                        ],
+                        requiredRenewals: ['VEHICLE_LICENSE', 'ROAD_WORTHINESS'],
+                        totalRenewalCost: 21000
+                    }
+                },
+                'PL-456-CD': {
+                    vehicle: {
+                        id: '3',
+                        plateNumber: 'PL-456-CD',
+                        chassisNumber: '5FNRL6H78MB123456',
+                        make: 'Lexus',
+                        model: 'ES 350',
+                        year: 2022,
+                        ownerName: 'Sarah Gyang',
+                        tin: '3045678901',
+                        vehicleType: 'PRIVATE'
+                    },
+                    compliance: {
+                        documents: [
+                            { type: 'VEHICLE_LICENSE', status: 'ACTIVE', expiryDate: '2026-03-15' },
+                            { type: 'ROAD_WORTHINESS', status: 'EXPIRED', expiryDate: '2024-12-01' },
+                            { type: 'INSURANCE', status: 'EXPIRED', expiryDate: '2024-10-10' },
+                            { type: 'PROOF_OF_OWNERSHIP', status: 'ACTIVE', expiryDate: '2032-01-01' }
+                        ],
+                        requiredRenewals: ['ROAD_WORTHINESS', 'INSURANCE'],
+                        totalRenewalCost: 17500
+                    }
+                }
+            };
+
+            // Check if this is a demo plate number
+            if (searchType === 'plate' && mockVehicles[trimmedId]) {
+                const mockData = mockVehicles[trimmedId];
+                setVehicle(mockData.vehicle);
+                setCompliance(mockData.compliance);
+                setShowResults(true);
+                toast.success('Vehicle found! (Demo Data)');
+                setIsLoading(false);
+                return;
+            }
 
             if (searchType === 'tin') {
                 lookupPayload.tin = trimmedId;
@@ -62,7 +146,7 @@ export default function VehicleLookup() {
                 setShowResults(true);
                 toast.success('Vehicle found!');
             } else {
-                toast.error('Vehicle not found');
+                toast.error('Vehicle not found. Try demo plates: PL-582-KN, PL-123-AB, or PL-456-CD');
                 setShowResults(false);
             }
         } catch (error: any) {
@@ -70,7 +154,7 @@ export default function VehicleLookup() {
             setVehicle(null);
             setCompliance(null);
             setShowResults(false);
-            // Error toast is handled by API service interceptor
+            toast.error('Vehicle not found. Try demo plates: PL-582-KN, PL-123-AB, or PL-456-CD');
         } finally {
             setIsLoading(false);
         }

@@ -40,7 +40,7 @@ export default function Footer() {
                 <div className="flex flex-col gap-6">
                     <h4 className="font-bold text-[#0d101b] dark:text-white uppercase tracking-wider text-xs">Governance</h4>
                     <div className="flex flex-col gap-4 text-sm text-[#4c599a] dark:text-white/60">
-                        <a className="hover:text-primary transition-colors" href="https://psirs.gov.ng" target="_blank" rel="noopener noreferrer">PSIRS Portal</a>
+                        <a className="hover:text-primary transition-colors" href="https://www.psirs.gov.ng" target="_blank" rel="noopener noreferrer">PSIRS Portal</a>
                         <a className="hover:text-primary transition-colors" href="https://plateaustate.gov.ng" target="_blank" rel="noopener noreferrer">State Government</a>
                         <Link className="hover:text-primary transition-colors" to="/help">Tax Laws</Link>
                         <Link className="hover:text-primary transition-colors" to="/help">Download Forms</Link>
