@@ -17,9 +17,17 @@ export default function Login() {
             const response = await login(formData.email, formData.password);
             if (response.success) {
                 toast.success('Login successful!');
-                // Redirect based on role will be handled by user state in AuthContext
-                // For now, redirect to agent dashboard (can be improved)
-                navigate('/agent');
+
+                // Redirect based on user role
+                const user = response.data;
+                if (user.role === 'AGENT') {
+                    navigate('/agent');
+                } else if (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN') {
+                    navigate('/admin');
+                } else {
+                    // PUBLIC users go to home/dashboard
+                    navigate('/');
+                }
             } else {
                 toast.error(response.message || 'Login failed');
             }
